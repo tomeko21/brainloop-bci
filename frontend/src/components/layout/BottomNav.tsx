@@ -1,3 +1,6 @@
+/**
+ * Floating bottom navigation (Feed / Settings / Admin) with an animated active pill.
+ */
 import { motion } from "motion/react";
 import { Clapperboard, Radar, SlidersHorizontal } from "lucide-react";
 import { NavLink } from "react-router-dom";

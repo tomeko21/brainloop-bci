@@ -1,16 +1,5 @@
-/** All data collection rates in one place. */
-export const TRACKING = {
-  /** How many times per second we compute face features (MediaPipe). 10 Hz = good performance/data trade-off. */
-  faceSampleHz: 10,
-  /** How often (ms) we record a scroll speed sample (only while the user is scrolling). */
-  scrollSampleMs: 100,
-  /** How often (ms) the feed sends a heartbeat to the admin panel. */
-  heartbeatMs: 2_000,
-  /** Reel playback clock tick. */
-  playbackTickMs: 100,
-  /** Window (ms) for blink rate and PERCLOS. */
-  eyeWindowMs: 60_000,
-} as const;
+/** Data collection rates live in ./tuning.ts – re-exported here for existing imports. */
+export { TRACKING } from "./tuning";
 
 /**
  * Model MediaPipe Face Landmarker (.task).

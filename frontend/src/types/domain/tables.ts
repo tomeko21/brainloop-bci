@@ -158,7 +158,10 @@ export interface MlWindowRow extends Stamp {
   dwell_mean_sec: number;
   watch_pct_mean: number;
   likes_in_window: number;
+  /** Camera model BRI (empty until the model is trained). */
   bri_ai: number;
+  /** EEG headset BRI at the same moment – the training label (empty without a headset). */
+  bri_eeg: number;
   should_stop: 0 | 1;
   model_version: string;
 }

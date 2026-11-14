@@ -1,5 +1,8 @@
+/**
+ * Camera opt-in with live preview; also preloads the MediaPipe face model while the user types.
+ */
 import { AnimatePresence, motion } from "motion/react";
-import { Camera, CameraOff, Clock, Eye, FileSpreadsheet, MicOff } from "lucide-react";
+import { Camera, CameraOff, Clock, Eye, FileSpreadsheet, MicOff, Server } from "lucide-react";
 import { useEffect } from "react";
 import { Switch } from "@/components/ui";
 import { CameraPreview } from "@/features/recording/components/CameraPreview";
@@ -17,6 +20,7 @@ const FACTS = [
   { icon: Clock, text: "Start and end timestamps" },
   { icon: Eye, text: "MediaPipe: eyes, blinking, head pose" },
   { icon: FileSpreadsheet, text: "Everything to CSV" },
+  { icon: Server, text: "Frames analysed by the backend (2 fps)" },
 ];
 
 export function CameraOptIn({ enabled, onChange }: Props) {

@@ -6,7 +6,7 @@ import { useCsvLogStore } from "@/store/csvLogStore";
 import { useSessionStore } from "@/store/sessionStore";
 import { formatDuration, formatPercent } from "@/lib/format";
 
-/** Stats: current session (from local CSV) + historical (from API / mock). */
+/** Stats: current session (from local CSV) + all sessions (from the backend DB). */
 export function StatsCard() {
   const session = useSessionStore((s) => s.session);
   const rows = useCsvLogStore((s) => s.rows);
@@ -25,7 +25,7 @@ export function StatsCard() {
 
   return (
     <Card className="sm:col-span-2">
-      <CardTitle icon={<BarChart3 className="size-3.5" />} right={<span className="font-mono text-[10px] uppercase text-muted">mock + live</span>}>
+      <CardTitle icon={<BarChart3 className="size-3.5" />} right={<span className="font-mono text-[10px] uppercase text-muted">live + db</span>}>
         Stats
       </CardTitle>
       <p className="mb-2 text-xs uppercase tracking-wider text-muted">This session</p>

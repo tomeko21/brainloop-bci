@@ -1,15 +1,8 @@
-/**
- * AI model API ("no headset" mode: camera + scroll -> BRI).
- * ⚠️ MOCK: when USE_MOCKS === true the result comes from the heuristic in ./mocks/ml.mock.ts,
- *          not a trained model. Real one: LightGBM in backend/app/ml.
- */
+/** ML API: BRI prediction from camera + scroll features (backend: app/ml/predictor.py). */
 import type { PredictWindowInput } from "@/types/api/input/useMl";
 import type { PredictWindowOutput } from "@/types/api/output/useMl";
-import { USE_MOCKS, http, mockDelay } from "./client";
-import { mockPredict } from "./mocks/ml.mock";
+import { http } from "./client";
 
-export async function predictWindow(input: PredictWindowInput): Promise<PredictWindowOutput> {
-  if (!USE_MOCKS) return http<PredictWindowOutput>("/api/ml/predict-window", { method: "POST", body: input });
-  await mockDelay(40, 120); // --- MOCK ---
-  return mockPredict(input);
+export function predictWindow(input: PredictWindowInput): Promise<PredictWindowOutput> {
+  return http<PredictWindowOutput>("/api/ml/predict-window", { method: "POST", body: input });
 }

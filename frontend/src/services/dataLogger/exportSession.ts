@@ -1,3 +1,7 @@
+/**
+ * Builds the session's CSV files (session, recordings, events, reel_views, scroll, face, ml_windows)
+ * and the optional ZIP bundle (CSVs + video segments). Used by the session lifecycle and Settings.
+ */
 import { strToU8, zipSync, type Zippable } from "fflate";
 import { TRACKING } from "@/config/tracking";
 import { objectsToCsv } from "@/lib/csv";

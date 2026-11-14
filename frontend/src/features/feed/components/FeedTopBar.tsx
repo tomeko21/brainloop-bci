@@ -1,7 +1,17 @@
-import { Leaf, RefreshCw } from "lucide-react";
+import { Leaf, RefreshCw, Volume2, VolumeX } from "lucide-react";
+import { usePlaybackStore } from "@/store/playbackStore";
+import { useSettingsStore } from "@/store/settingsStore";
+import { useCalmStore } from "@/store/calmStore";
 import { Logo } from "@/components/ui";
 
-export function FeedTopBar({ calm, onRefresh, refreshing }: { calm: boolean; onRefresh: () => void; refreshing: boolean }) {
+export function FeedTopBar({ onRefresh, refreshing }: { onRefresh: () => void; refreshing: boolean }) {
+  // Rounded to whole percent -> re-renders only when the visible number changes
+  const calmPct = useCalmStore((s) => Math.round(s.intensity * 100));
+  const muted = useSettingsStore((s) => s.muted);
+  const setMuted = useSettingsStore((s) => s.setMuted);
+  const blocked = usePlaybackStore((s) => s.audioBlocked);
+  const silent = muted || blocked;
+
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between bg-gradient-to-b from-black/50 to-transparent p-4 pt-[max(env(safe-area-inset-top),16px)] text-white">
       <Logo compact />
@@ -13,11 +23,28 @@ export function FeedTopBar({ calm, onRefresh, refreshing }: { calm: boolean; onR
         </span>
       </div>
       <div className="pointer-events-auto flex items-center gap-2">
-        {calm && (
-          <span title="Calm filter active" className="grid size-9 place-items-center rounded-full bg-ok/20 text-ok backdrop-blur">
-            <Leaf className="size-4" />
+        {calmPct >= 2 && (
+          <span
+            title="Calm filter is softening playback (dopamine peak detected)"
+            className="flex h-9 items-center gap-1 rounded-full bg-ok/20 px-2.5 font-mono text-xs text-ok"
+          >
+            <Leaf className="size-4" /> {calmPct}%
           </span>
         )}
+        <button
+          type="button"
+          onClick={() => {
+            if (blocked) usePlaybackStore.getState().setAudioBlocked(false);
+            else setMuted(!muted);
+          }}
+          aria-label={silent ? "Turn sound on" : "Mute"}
+          className={
+            "grid size-9 cursor-pointer place-items-center rounded-full backdrop-blur transition-colors " +
+            (blocked ? "animate-pulse bg-neon-pink/30" : "bg-white/10 hover:bg-white/20")
+          }
+        >
+          {silent ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+        </button>
         <button
           type="button"
           onClick={onRefresh}

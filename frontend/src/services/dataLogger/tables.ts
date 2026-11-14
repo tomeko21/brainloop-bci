@@ -1,3 +1,7 @@
+/**
+ * In-memory data tables of the current session + their CSV column order.
+ * Adding a column: extend the row type in types/domain/tables.ts AND the column list here.
+ */
 import type { FaceRow, MlWindowRow, ReelViewRow, ScrollRow } from "@/types/domain";
 import { DataTable } from "./DataTable";
 
@@ -29,7 +33,7 @@ export const ML_WINDOW_COLUMNS = [
   "session_id", "ts_ms", "t_rel_ms", "window_start_ms", "window_end_ms",
   "face_present_ratio", "ear_mean", "blink_rate_per_min", "perclos", "head_pitch_mean", "head_motion", "jaw_open_max",
   "scroll_speed_mean", "scroll_samples", "dwell_mean_sec", "watch_pct_mean", "likes_in_window",
-  "bri_ai", "should_stop", "model_version",
+  "bri_ai", "bri_eeg", "should_stop", "model_version",
 ] as const satisfies readonly (keyof MlWindowRow)[];
 
 /** Tables of the current session (cleared when a new one starts). */

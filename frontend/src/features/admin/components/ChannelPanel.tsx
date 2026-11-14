@@ -1,8 +1,14 @@
+/**
+ * Admin: per-electrode view like the BrainAccess app – PTP µV, contact quality, mini trace,
+ * saturation warning and the accelerometer.
+ */
 import { Activity, Move3d } from "lucide-react";
+import { NoEegData } from "./NoEegData";
 import { Badge, Card, CardTitle } from "@/components/ui";
 import { CHANNEL_COLORS, QUALITY_META, channelQuality, formatUv } from "@/lib/eeg";
 import { ELECTRODES, type BrainSnapshot } from "@/types/domain";
 import { useSnapshotHistory } from "../useSnapshotHistory";
+import { useWaveBuffer } from "../useWaveBuffer";
 import { MiniTrace } from "./MiniTrace";
 
 const AXES = [
@@ -11,9 +17,17 @@ const AXES = [
   { key: "z", label: "Accel_z", color: "#3f5fb0" },
 ] as const;
 
+/** Symmetric y-range: ±100 µV, or wider when the signal is bigger (so artifacts are not clipped). */
+function traceRange(v: number[]) {
+  let m = 100;
+  for (const x of v) m = Math.max(m, Math.abs(x));
+  return { min: -m, max: m };
+}
+
 /** Headset channels as in the BrainAccess app: color, PTP in µV, contact quality, preview + accelerometer. */
-export function ChannelPanel({ data }: { data: BrainSnapshot | undefined }) {
-  const history = useSnapshotHistory(data);
+export function ChannelPanel({ data, live }: { data: BrainSnapshot | undefined; live: boolean }) {
+  const history = useSnapshotHistory(data, 100); // accelerometer: ~10 s at 10 snapshots/s
+  const waves = useWaveBuffer(data, 4); // raw EEG, last 4 s, real time
   const good = ELECTRODES.filter((e) => channelQuality(data, e) === "good").length;
 
   return (
@@ -24,7 +38,17 @@ export function ChannelPanel({ data }: { data: BrainSnapshot | undefined }) {
       >
         Headset channels · BrainAccess
       </CardTitle>
+      {!live ? (
+        <NoEegData />
+      ) : (
+        <>
 
+      {data?.saturated === ELECTRODES.length && (
+        <p className="mb-3 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn">
+          All channels are saturated (amplifier at its limit) – the reference/bias electrode (ear clip) is not touching
+          the skin. Fix it and the channels turn green.
+        </p>
+      )}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {ELECTRODES.map((e) => {
           const q = channelQuality(data, e);
@@ -42,8 +66,12 @@ export function ChannelPanel({ data }: { data: BrainSnapshot | undefined }) {
                   </span>
                 </span>
               </div>
-              <p className="mt-1 font-mono text-[11px] text-muted">PTP {formatUv(ptp)}</p>
-              <MiniTrace values={history.map((h) => (channelQuality(h, e) === "good" ? h.channels[e] : 0))} color={CHANNEL_COLORS[e]} min={0} max={1} />
+              <p className="mt-1 flex justify-between font-mono text-[11px] text-muted">
+                <span>PTP {formatUv(ptp)}</span>
+                {data?.artifacts?.includes(e) && <span className="text-warn" title="Blink / spike – left out of BRI for this window">blink</span>}
+              </p>
+              {/* Raw band-passed signal (±100 µV, wider if needed) – blinks show up as big bumps on F3/F4 */}
+              <MiniTrace values={waves[e]} color={CHANNEL_COLORS[e]} {...traceRange(waves[e])} />
             </div>
           );
         })}
@@ -68,6 +96,8 @@ export function ChannelPanel({ data }: { data: BrainSnapshot | undefined }) {
           ))}
         </div>
       </div>
+        </>
+      )}
     </Card>
   );
 }

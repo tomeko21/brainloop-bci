@@ -22,19 +22,3 @@ export function downloadText(text: string, fileName: string, mime = "text/csv;ch
   downloadBlob(new Blob([text], { type: mime }), fileName);
 }
 
-/** "Łukasz Ż." -> "lukasz-z" (safe in a folder name). */
-export function slug(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ł/g, "l").replace(/Ł/g, "L")
-    .replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "anon";
-}
-
-/**
- * Session folder in data/sessions/: start date and time + person + id.
- * Each session has its own folder -> later sessions are added, never overwritten.
- */
-export function sessionFolderName(session: { id: string; subjectName: string; startedAtMs: number }): string {
-  const d = new Date(session.startedAtMs);
-  const p = (n: number) => String(n).padStart(2, "0");
-  const stampStr = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`;
-  return `${stampStr}_${slug(session.subjectName)}_${session.id}`;
-}

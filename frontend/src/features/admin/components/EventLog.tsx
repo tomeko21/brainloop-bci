@@ -1,9 +1,11 @@
+/**
+ * Admin: live tail of the watched session's events (sent by the feed with every heartbeat).
+ */
 import { AnimatePresence, motion } from "motion/react";
 import { ScrollText } from "lucide-react";
-import { useEffect } from "react";
 import { Card, CardTitle } from "@/components/ui";
 import { EmptyState } from "@/components/feedback";
-import { useCsvLogStore } from "@/store/csvLogStore";
+import { useLiveEvents } from "@/hooks/useAdmin";
 import { formatTime } from "@/lib/format";
 import type { CsvEventType } from "@/types/domain";
 
@@ -17,23 +19,14 @@ const TONE: Partial<Record<CsvEventType, string>> = {
   feed_refresh: "text-neon-violet",
 };
 
-/** Tail of the global CSV. MOCK: synced between tabs via the `storage` event. */
+/** Live tail of the watched session's events.csv (the feed sends new rows with every heartbeat). */
 export function EventLog() {
-  const rows = useCsvLogStore((s) => s.rows);
-
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === useCsvLogStore.persist.getOptions().name) void useCsvLogStore.persist.rehydrate();
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-
-  const tail = rows.slice(-14).reverse();
+  const { data } = useLiveEvents();
+  const tail = data ?? [];
 
   return (
     <Card className="md:col-span-2 lg:col-span-3">
-      <CardTitle icon={<ScrollText className="size-3.5" />} right={<span className="font-mono text-[10px] text-muted">{rows.length} rows</span>}>
+      <CardTitle icon={<ScrollText className="size-3.5" />} right={<span className="font-mono text-[10px] text-muted">{tail.length} latest</span>}>
         Event stream (CSV)
       </CardTitle>
       {tail.length === 0 ? (
@@ -51,7 +44,7 @@ export function EventLog() {
                     <td className="py-1.5 text-muted">{formatTime(r.tsMs)}</td>
                     <td>{(r.tRelMs / 1000).toFixed(1)}s</td>
                     <td>{r.subjectName}</td>
-                    <td className={TONE[r.event] ?? ""}>{r.event}</td>
+                    <td className={TONE[r.event as CsvEventType] ?? ""}>{r.event}</td>
                     <td>{r.reelId || "—"}</td>
                     <td className="max-w-[120px] truncate">{r.value || "—"}</td>
                   </motion.tr>

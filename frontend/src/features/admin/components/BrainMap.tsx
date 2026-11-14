@@ -1,5 +1,6 @@
 import { motion } from "motion/react";
 import { Brain } from "lucide-react";
+import { NoEegData } from "./NoEegData";
 import { Card, CardTitle } from "@/components/ui";
 import type { EegStreamOutput } from "@/types/api/output/useEeg";
 import { StreamBadge } from "./StreamBadge";
@@ -28,13 +29,17 @@ const GYRI = [
 /** 0 -> cyan, 0.5 -> violet, 1 -> pink */
 const colorFor = (v: number) => `hsl(${190 + v * 135} 95% ${55 + v * 10}%)`;
 
-export function BrainMap({ stream }: { stream: EegStreamOutput }) {
+export function BrainMap({ stream, live }: { stream: EegStreamOutput; live: boolean }) {
   const data: BrainSnapshot | undefined = stream.data;
   return (
     <Card glow className="flex flex-col">
       <CardTitle icon={<Brain className="size-3.5" />} right={<StreamBadge stream={stream} />}>
         Cortical activity
       </CardTitle>
+      {!live ? (
+        <NoEegData />
+      ) : (
+        <>
       <div className="relative mx-auto w-full max-w-sm">
         <svg viewBox="0 0 300 350" className="w-full">
           <defs>
@@ -64,7 +69,7 @@ export function BrainMap({ stream }: { stream: EegStreamOutput }) {
                 const v = ok ? (data?.channels[e] ?? 0.1) : 0;
                 return (
                   <circle key={e} cx={POS[e].x} cy={POS[e].y} r={48} fill={colorFor(v)}
-                    style={{ opacity: ok ? 0.15 + v * 0.8 : 0, transition: "opacity 380ms ease, fill 380ms ease" }} />
+                    style={{ opacity: ok ? 0.15 + v * 0.8 : 0, transition: "opacity 120ms linear, fill 120ms linear" }} />
                 );
               })}
             </g>
@@ -113,6 +118,8 @@ export function BrainMap({ stream }: { stream: EegStreamOutput }) {
           </span>
         ))}
       </div>
+        </>
+      )}
     </Card>
   );
 }

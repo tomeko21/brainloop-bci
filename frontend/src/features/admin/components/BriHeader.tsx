@@ -1,3 +1,7 @@
+/**
+ * Admin: BRI (BrainRot Index) from the EEG headset vs from the camera model, with their agreement chart.
+ * The camera model is not trained yet (backend/app/ml/predictor.py) – its gauge says so.
+ */
 import { motion } from "motion/react";
 import { Brain, Cpu, GitCompareArrows } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -31,7 +35,7 @@ function Gauge({ title, icon, value, source, subtitle, children }: {
           <path d="M14 60 A46 46 0 0 1 106 60" fill="none" stroke="var(--surface-strong)" strokeWidth="10" strokeLinecap="round" />
           <path d="M14 60 A46 46 0 0 1 106 60" fill="none" stroke={value === null ? "transparent" : briColor(v)} strokeWidth="10" strokeLinecap="round"
             strokeDasharray={C} strokeDashoffset={C * (1 - v / 100)}
-            style={{ transition: "stroke-dashoffset 500ms ease, stroke 500ms ease", filter: `drop-shadow(0 0 6px ${briColor(v)})` }} />
+            style={{ transition: "stroke-dashoffset 150ms linear, stroke 150ms linear", filter: `drop-shadow(0 0 6px ${briColor(v)})` }} />
         </svg>
         <div className="absolute inset-x-0 bottom-0 text-center">
           <p className="font-mono text-4xl font-medium tabular-nums">{value === null ? "—" : Math.round(v)}</p>
@@ -46,15 +50,15 @@ function Gauge({ title, icon, value, source, subtitle, children }: {
   );
 }
 
-/** History of both BRIs (1 point/s) for comparison on one chart. */
-function useBriHistory(eeg: number | null, ai: number | null, size = 90) {
+/** History of both BRIs (4 points/s, last 60 s) for comparison on one chart. */
+function useBriHistory(eeg: number | null, ai: number | null, size = 240) {
   const [hist, setHist] = useState<{ eeg: number | null; ai: number | null }[]>([]);
   const latest = useRef({ eeg, ai });
   useLayoutEffect(() => {
     latest.current = { eeg, ai };
   }, [eeg, ai]);
   useEffect(() => {
-    const id = window.setInterval(() => setHist((h) => [...h.slice(-(size - 1)), latest.current]), 1_000);
+    const id = window.setInterval(() => setHist((h) => [...h.slice(-(size - 1)), latest.current]), 250);
     return () => window.clearInterval(id);
   }, [size]);
   return hist;
@@ -83,9 +87,9 @@ function DualTrend({ hist }: { hist: { eeg: number | null; ai: number | null }[]
  *  - AI: model on camera + scroll, works WITHOUT a headset (student).
  * Agreement of both = proof for the jury that the model "sees" the same as the EEG.
  */
-export function BriHeader({ eeg }: { eeg: EegStreamOutput }) {
+export function BriHeader({ eeg, live }: { eeg: EegStreamOutput; live: boolean }) {
   const { data: viewer } = useLiveViewer();
-  const briEeg = eeg.data?.bri ?? null;
+  const briEeg = live ? (eeg.data?.bri ?? null) : null;
   const pred = viewer?.status !== "offline" ? (viewer?.prediction ?? null) : null;
   const briAi = pred?.bri ?? null;
   const hist = useBriHistory(briEeg, briAi);
@@ -104,8 +108,16 @@ export function BriHeader({ eeg }: { eeg: EegStreamOutput }) {
           title="BRI · EEG"
           icon={<Brain className="size-3.5" />}
           value={briEeg}
-          subtitle="from headset electrodes (backend)"
-          source={<Badge tone={eeg.transport === "mock" ? "warn" : "cyan"} dot={eeg.status === "open"}>{eeg.transport}</Badge>}
+          subtitle={
+            !live
+              ? "Connect the EEG headset to see data"
+              : eeg.data?.calibrating
+                ? eeg.data.calibrationMode === "fixation"
+                  ? `Resting baseline (fixation cross)… ${Math.round((eeg.data.calibrationProgress ?? 0) * 100)}% of clean signal`
+                  : `Calibrating to this person… ${Math.round((eeg.data.calibrationProgress ?? 0) * 100)}% (30 s of clean signal)`
+                : "from headset electrodes (BrainAccess)"
+          }
+          source={live ? <Badge tone="cyan" dot>live</Badge> : <Badge>no headset</Badge>}
         />
 
         <div className="flex flex-[1.3] flex-col justify-between rounded-2xl bg-surface p-4">
@@ -133,8 +145,18 @@ export function BriHeader({ eeg }: { eeg: EegStreamOutput }) {
           title="BRI · AI prediction"
           icon={<Cpu className="size-3.5" />}
           value={briAi}
-          subtitle={pred ? `camera + scroll · ${pred.modelVersion}` : "camera + scroll (no headset)"}
-          source={<Badge tone={pred?.modelVersion.startsWith("mock") ? "warn" : "violet"}>{pred?.modelVersion.startsWith("mock") ? "mock" : "model"}</Badge>}
+          subtitle={
+            pred?.modelVersion === "not-trained"
+              ? "camera model not trained yet – collecting training data"
+              : pred
+                ? `camera + scroll · ${pred.modelVersion}`
+                : "camera + scroll (no headset)"
+          }
+          source={
+            !pred ? <Badge>no data</Badge>
+            : pred.modelVersion === "not-trained" ? <Badge tone="warn">not trained</Badge>
+            : <Badge tone="violet">model</Badge>
+          }
         >
           {pred && pred.topFactors.length > 0 && (
             <div className="mt-2 flex flex-wrap justify-center gap-1">

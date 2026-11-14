@@ -1,9 +1,14 @@
+/**
+ * One reel: video player, tap = pause, double tap = like, caption + actions overlay.
+ */
 import { AnimatePresence, motion } from "motion/react";
 import { Pause, Play } from "lucide-react";
 import { useRef, useState } from "react";
+import { FEED } from "@/config/tuning";
 import type { Reel } from "@/types/domain";
 import { logEvent } from "@/store/csvLogStore";
 import { usePlaybackStore } from "@/store/playbackStore";
+import { useSettingsStore } from "@/store/settingsStore";
 import { FeedProgressBar } from "./ProgressBar";
 import { ReelPlayer } from "./ReelPlayer";
 import { ReelActions } from "./ReelActions";
@@ -14,13 +19,17 @@ interface Props {
   reel: Reel;
   index: number;
   active: boolean;
-  calm: boolean;
+  /** Active reel or its direct neighbour – only these mount a <video> (preloading the next one). */
+  near: boolean;
+  /** False while the user is on another tab – the reel pauses (and keeps its position). */
+  feedVisible: boolean;
   onLike: (reel: Reel, like: boolean) => void;
 }
 
-const DOUBLE_TAP_MS = 280;
+const DOUBLE_TAP_MS = FEED.doubleTapMs;
 
-export function ReelCard({ reel, index, active, calm, onLike }: Props) {
+export function ReelCard({ reel, index, active, near, feedVisible, onLike }: Props) {
+  const muted = useSettingsStore((s) => s.muted);
   // Pause lives in the playback clock (resets when the reel changes)
   const paused = usePlaybackStore((s) => active && s.reelId === reel.id && s.paused);
   const [burst, setBurst] = useState(0);
@@ -52,7 +61,15 @@ export function ReelCard({ reel, index, active, calm, onLike }: Props) {
       className="relative h-full w-full shrink-0 snap-start snap-always overflow-hidden"
       onClick={handleTap}
     >
-      <ReelPlayer reel={reel} playing={active && !paused} calm={calm} progressBar={<FeedProgressBar reelId={reel.id} />} />
+      <ReelPlayer
+        reel={reel}
+        playing={active && !paused && feedVisible}
+        mountVideo={near}
+        muted={muted}
+        trackPlayback={active}
+        rewind={!active}
+        progressBar={<FeedProgressBar reelId={reel.id} />}
+      />
       <HeartBurst burstKey={burst} />
 
       <AnimatePresence>

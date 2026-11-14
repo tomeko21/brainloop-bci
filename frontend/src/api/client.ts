@@ -1,12 +1,11 @@
 /**
- * Shared API client.
+ * Shared API client – every request goes to the FastAPI backend (../backend).
  *
- * For now the WHOLE app runs on mocks (USE_MOCKS = true).
- * Once the FastAPI backend is ready: set VITE_USE_MOCKS=false in .env
- * and every function in the *.api.ts files will switch to the real `http()`.
+ * In dev the Vite server proxies /api, /media and /ws to the backend (see vite.config.ts),
+ * so the default base URL is "" (same origin). Set VITE_API_URL only when the frontend
+ * is served separately from the API (e.g. a production build on another host).
  */
-export const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
-export const USE_MOCKS = (import.meta.env.VITE_USE_MOCKS ?? "true") !== "false";
+export const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -18,7 +17,6 @@ export class ApiError extends Error {
 
 type HttpOptions = Omit<RequestInit, "body"> & { body?: unknown };
 
-/** Real fetch to the backend (used when USE_MOCKS === false). */
 export async function http<T>(path: string, { body, headers, ...init }: HttpOptions = {}): Promise<T> {
   const isForm = body instanceof FormData;
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -30,8 +28,17 @@ export async function http<T>(path: string, { body, headers, ...init }: HttpOpti
   return (await res.json()) as T;
 }
 
-/** MOCK: simulates network latency so loaders and animations are visible. */
-export function mockDelay(min = 180, max = 520): Promise<void> {
-  const ms = min + Math.random() * (max - min);
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/** Absolute URL for media served by the backend (videos). */
+export const mediaUrl = (path: string) => `${API_BASE_URL}${path}`;
+
+/** ws:// or wss:// URL for a backend WebSocket path. */
+export function wsUrl(path: string): string {
+  const base = API_BASE_URL || window.location.origin;
+  return base.replace(/^http/, "ws") + path;
 }
+
+export const query = (params: Record<string, string | number | boolean | undefined | null>) => {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null) q.set(k, String(v));
+  return q.toString();
+};

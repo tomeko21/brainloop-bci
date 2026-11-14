@@ -1,23 +1,34 @@
+/**
+ * The vertical feed: snap scrolling, infinite batches of reels from the backend, pull-to-refresh,
+ * keyboard navigation and the per-reel data collection hooks. Stays mounted across tabs (see AppShell).
+ */
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { FEED } from "@/config/tuning";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ErrorState, LoadingState } from "@/components/feedback";
 import { useFeed, useToggleLike } from "@/hooks/useFeed";
 import { logEvent } from "@/store/csvLogStore";
-import { useSettingsStore } from "@/store/settingsStore";
+import { useSessionStore } from "@/store/sessionStore";
+import { usePlaybackStore } from "@/store/playbackStore";
 import type { Reel } from "@/types/domain";
 import { useActiveReelTracking } from "../useActiveReelTracking";
-import { usePlaybackClock } from "../usePlaybackClock";
 import { useScrollTracker } from "../useScrollTracker";
 import { usePullToRefresh } from "../usePullToRefresh";
 import { ReelCard } from "./ReelCard";
 import { FeedEnd } from "./FeedEnd";
 import { FeedTopBar } from "./FeedTopBar";
 import { PullIndicator } from "./PullIndicator";
+import { FixationCross } from "./FixationCross";
 
 /** Vertical Reels-style feed: snap-scroll, infinite loading, pull-to-refresh. */
-export function FeedList() {
-  const calm = useSettingsStore((s) => s.calmFilter);
-  const feed = useFeed({ calmFilter: calm });
+export function FeedList({ visible: tabVisible = true }: { visible?: boolean }) {
+  const sessionId = useSessionStore((s) => s.session?.id ?? "");
+  // First 30 s of a session = fixation cross (resting EEG baseline); reels play only after it
+  const baselinePending = useSessionStore((s) => !!s.session && s.baselineDoneFor !== s.session.id);
+  const visible = tabVisible && !baselinePending;
+  // Pull-to-refresh moves the start cursor past everything loaded -> fresh reels from the backend
+  const [startCursor, setStartCursor] = useState(0);
+  const feed = useFeed({ sessionId, startCursor });
   const { mutate: toggleLike } = useToggleLike();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -26,9 +37,9 @@ export function FeedList() {
   const activeReel = reels[activeIndex];
 
   // Data collection: scroll speed, playback clock (loop), reel views
-  const scroll = useScrollTracker(scrollRef, activeIndex, reels.length > 0);
-  usePlaybackClock(activeReel);
+  const scroll = useScrollTracker(scrollRef, activeIndex, reels.length > 0 && visible);
   useActiveReelTracking(activeReel, activeIndex, {
+    enabled: visible, // feed hidden (other tab) = not watching -> the view ends, admin sees "offline"
     getReel: (id) => reels.find((r) => r.id === id),
     takeScrollPeak: scroll.takePeak,
   });
@@ -38,12 +49,13 @@ export function FeedList() {
     if (el) el.scrollTo({ top: index * el.clientHeight, behavior: "smooth" });
   }, []);
 
-  const { refetch } = feed;
+  const lastCursor = feed.data?.pages.at(-1)?.nextCursor ?? startCursor;
   const onRefresh = useCallback(async () => {
-    logEvent("feed_refresh");
+    logEvent("feed_refresh", { value: lastCursor });
     scrollTo(0);
-    await Promise.all([refetch(), new Promise((r) => setTimeout(r, 700))]);
-  }, [refetch, scrollTo]);
+    setStartCursor(lastCursor);
+    await new Promise((r) => setTimeout(r, 700));
+  }, [lastCursor, scrollTo]);
   const ptr = usePullToRefresh(scrollRef, onRefresh, reels.length > 0);
 
   // Which reel is visible (>= 60% of height)
@@ -65,17 +77,18 @@ export function FeedList() {
   // Load the next page when nearing the end
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = feed;
   useEffect(() => {
-    if (activeIndex >= reels.length - 3 && hasNextPage && !isFetchingNextPage) void fetchNextPage();
+    if (activeIndex >= reels.length - FEED.prefetchWhenLeft && hasNextPage && !isFetchingNextPage) void fetchNextPage();
   }, [activeIndex, reels.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Filter changed -> scroll back to top
+  // Filter changed / refreshed -> back to the top
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
     setActiveIndex(0);
-  }, [calm]);
+  }, [startCursor]);
 
   // Keyboard: ↑/↓ and j/k
   useEffect(() => {
+    if (!visible) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return;
       if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); scrollTo(Math.min(activeIndex + 1, reels.length)); }
@@ -83,19 +96,24 @@ export function FeedList() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeIndex, reels.length, scrollTo]);
+  }, [activeIndex, reels.length, scrollTo, visible]);
 
   const handleLike = useCallback(
     (reel: Reel, like: boolean) => {
       logEvent(like ? "reel_like" : "reel_unlike", { reelId: reel.id });
-      toggleLike({ reelId: reel.id, like });
+      toggleLike({ reelId: reel.id, like, sessionId });
     },
-    [toggleLike],
+    [toggleLike, sessionId],
   );
 
   return (
-    <div className="relative mx-auto h-dvh w-full max-w-[480px] overflow-hidden bg-black sm:my-0 sm:border-x sm:border-white/10 sm:shadow-[0_0_120px_-20px_rgb(167_139_250/0.35)]">
-      <FeedTopBar calm={calm} onRefresh={() => void ptr.refresh()} refreshing={ptr.refreshing} />
+    <div
+      className="relative mx-auto h-dvh w-full max-w-[480px] overflow-hidden bg-black sm:my-0 sm:border-x sm:border-white/10 sm:shadow-[0_0_120px_-20px_rgb(167_139_250/0.35)]"
+      // Any tap is a user gesture -> the browser allows sound again
+      onPointerDown={() => usePlaybackStore.getState().audioBlocked && usePlaybackStore.getState().setAudioBlocked(false)}
+    >
+      {baselinePending && <FixationCross visible={tabVisible} />}
+      <FeedTopBar onRefresh={() => void ptr.refresh()} refreshing={ptr.refreshing || feed.isPending} />
       <PullIndicator pull={ptr.pull} progress={ptr.progress} refreshing={ptr.refreshing} />
 
       {feed.isPending ? (
@@ -109,7 +127,7 @@ export function FeedList() {
           style={{ transform: `translateY(${ptr.pull * 0.6}px)` }}
         >
           {reels.map((reel, i) => (
-            <ReelCard key={reel.id} reel={reel} index={i} active={i === activeIndex} calm={calm} onLike={handleLike} />
+            <ReelCard key={reel.id} reel={reel} index={i} active={i === activeIndex} near={Math.abs(i - activeIndex) <= 1} feedVisible={visible} onLike={handleLike} />
           ))}
           {isFetchingNextPage && <div className="grid h-full shrink-0 snap-start place-items-center"><LoadingState /></div>}
           {!hasNextPage && <FeedEnd />}

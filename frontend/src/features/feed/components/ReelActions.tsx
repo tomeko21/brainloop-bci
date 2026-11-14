@@ -1,3 +1,6 @@
+/**
+ * Right-hand action column of a reel: like (animated), comments, share, save.
+ */
 import { AnimatePresence, motion } from "motion/react";
 import { Bookmark, Heart, MessageCircle, Send } from "lucide-react";
 import { useState } from "react";
