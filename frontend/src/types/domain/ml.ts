@@ -32,11 +32,17 @@ export interface MlFactor {
 }
 
 export interface MlPrediction {
-  /** BRI (BrainRot Index) 0..100 from the model. */
-  bri: number;
+  /** BRI 0..100 from the CAMERA model – null until the model is trained (backend/app/ml/predictor.py). */
+  bri: number | null;
+  /** BRI 0..100 from the EEG headset at the same moment – null without a streaming headset. */
+  briEeg: number | null;
+  /** Best available BRI (camera, else EEG) crossed the break threshold. */
   shouldStop: boolean;
   modelVersion: string;
   /** Top factors (to explain "why" to the jury). */
   topFactors: MlFactor[];
   predictedAtMs: number;
 }
+
+/** Best available BRI: the camera model when trained, otherwise the EEG headset. */
+export const bestBri = (p: MlPrediction | null | undefined): number | null => p?.bri ?? p?.briEeg ?? null;

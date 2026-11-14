@@ -1,32 +1,56 @@
-import { AnimatePresence, motion } from "motion/react";
+/**
+ * Layout of the user screens. Also runs the session-wide background jobs:
+ * AI/EEG prediction polling, camera frame upload, calm filter, scroll reminder.
+ */
+import { motion } from "motion/react";
 import { useLocation, useOutlet } from "react-router-dom";
 import { BottomNav } from "./BottomNav";
 import { RecordingIndicator } from "@/features/recording/components/RecordingIndicator";
 import { CameraPip } from "@/features/recording/components/CameraPip";
 import { ResumeRecordingBanner } from "@/features/recording/components/ResumeRecordingBanner";
 import { useLivePrediction } from "@/features/ml/useLivePrediction";
+import { useFrameStreaming } from "@/features/recording/useFrameStreaming";
+import { useCalmFilter } from "@/features/calm/useCalmFilter";
+import { ScrollReminder } from "@/features/calm/components/ScrollReminder";
+import { FeedList } from "@/features/feed/components/FeedList";
+import { ROUTES } from "@/app/routes";
+import { UI } from "@/config/tuning";
 
-/** Layout for user screens (feed / settings) with animated page transitions. */
+/** Layout for user screens (feed / settings) with a light page transition. */
 export function AppShell() {
   const location = useLocation();
   const outlet = useOutlet();
+  const isFeed = location.pathname === ROUTES.feed;
   useLivePrediction(); // AI computes BRI in the background throughout the session
+  useFrameStreaming(); // camera frames -> backend every 2 s
+  useCalmFilter(); // softens playback on a dopamine peak (BRI)
 
   return (
     <div className="relative min-h-dvh">
-      <AnimatePresence mode="wait" initial={false}>
+      {/*
+        The feed stays mounted the whole session (only hidden on other tabs), so coming back
+        keeps the same reel, the same video time and scroll position – nothing reloads.
+      */}
+      <div
+        aria-hidden={!isFeed}
+        className={isFeed ? "relative" : "pointer-events-none invisible absolute inset-x-0 top-0"}
+      >
+        <FeedList visible={isFeed} />
+      </div>
+
+      {!isFeed && (
         <motion.main
           key={location.pathname}
-          initial={{ opacity: 0, y: 12, filter: "blur(6px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          exit={{ opacity: 0, y: -12, filter: "blur(6px)" }}
-          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: UI.pageFadeMs / 1000, ease: "easeOut" }}
         >
           {outlet}
         </motion.main>
-      </AnimatePresence>
+      )}
       <RecordingIndicator />
       <ResumeRecordingBanner />
+      <ScrollReminder />
       <CameraPip />
       <BottomNav />
     </div>

@@ -2,7 +2,9 @@ import { faceTable, reelViewsTable, scrollTable } from "@/services/dataLogger/ta
 import { useCsvLogStore } from "@/store/csvLogStore";
 import type { MlFeatureWindow } from "@/types/domain";
 
-export const WINDOW_MS = 10_000;
+import { ML } from "@/config/tuning";
+
+export const WINDOW_MS = ML.windowMs;
 
 /** Rows from the end of the array newer than `since` (arrays grow over time -> scan from the end). */
 function tail<T extends { ts_ms: number }>(rows: readonly T[], since: number): T[] {
@@ -21,7 +23,12 @@ const std = (xs: number[]) => {
   return v.length > 1 ? Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length) : NaN;
 };
 
-/** Feature vector from the last 10 s – the same for training (ml_windows.csv) and prediction. */
+/**
+ * Feature vector from the last 10 s – the same for training (ml_windows.csv) and prediction.
+ * TODO(team): if you add/remove features for the camera model, change them here, in MlFeatureWindow
+ * (types/domain/ml.ts + backend/app/schemas.py) and in the ml_windows columns – training and inference
+ * must use exactly the same features.
+ */
 export function buildFeatureWindow(sessionId: string, now = Date.now()): MlFeatureWindow {
   const start = now - WINDOW_MS;
   const face = tail(faceTable.snapshot(), start);

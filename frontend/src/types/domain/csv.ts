@@ -13,6 +13,11 @@ export type CsvEventType =
   | "reel_like"
   | "reel_unlike"
   | "feed_refresh"
+  | "baseline_start"
+  | "baseline_end"
+  | "baseline_abort"
+  | "calm_filter"
+  | "scroll_reminder"
   | "settings_change";
 
 /** One row of events.csv (discrete events). */

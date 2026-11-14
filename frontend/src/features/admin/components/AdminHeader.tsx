@@ -1,12 +1,17 @@
+/**
+ * Admin header: backend health, EEG headset status, camera model version, clock.
+ */
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge, Button, Logo } from "@/components/ui";
 import { useNow } from "@/lib/useNow";
 import { formatTime } from "@/lib/format";
-import { USE_MOCKS } from "@/api/client";
+import { useHealth } from "@/hooks/useHealth";
+import { EegStatusBadge } from "@/features/recording/components/EegStatusBadge";
 
 export function AdminHeader() {
   const now = useNow();
+  const health = useHealth();
   return (
     <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
       <div className="flex items-center gap-4">
@@ -18,7 +23,17 @@ export function AdminHeader() {
         </div>
       </div>
       <div className="flex items-center gap-3">
-        {USE_MOCKS && <Badge tone="warn">mock data</Badge>}
+        {health.isError ? (
+          <Badge tone="danger">backend offline</Badge>
+        ) : health.data ? (
+          <>
+            <Badge tone={health.data.status === "ok" ? "ok" : "warn"} dot>
+              API · {health.data.activeReels} reels
+            </Badge>
+            <EegStatusBadge className="py-1" />
+            <Badge tone="violet">{health.data.modelVersion}</Badge>
+          </>
+        ) : null}
         <span className="font-mono text-sm tabular-nums text-muted">{formatTime(now)}</span>
         <Link to="/">
           <Button variant="secondary" size="sm"><ArrowLeft className="size-3.5" />App</Button>

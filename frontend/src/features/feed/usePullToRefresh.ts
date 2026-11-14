@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const THRESHOLD = 72;
-const MAX_PULL = 120;
+import { FEED } from "@/config/tuning";
+
+const THRESHOLD = FEED.pullThresholdPx;
+const MAX_PULL = FEED.pullMaxPx;
 
 /**
  * Pull-to-refresh at the very top of the feed.

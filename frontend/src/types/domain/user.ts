@@ -13,7 +13,7 @@ export interface UserStats {
   likesGiven: number;
   avgWatchTimeSec: number;
   totalSessionTimeSec: number;
-  /** Mean fatigue indicator 0..1 over recent sessions (mock). */
+  /** Mean AI BRI / 100 over the user's recorded windows. */
   avgFatigue: number;
   /** Focus indicator from the last 12 windows (for the mini chart). */
   focusTrend: number[];

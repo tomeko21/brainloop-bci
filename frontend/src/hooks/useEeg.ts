@@ -1,13 +1,15 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { EEG_TRANSPORT, subscribeEegStream } from "@/api/eeg.api";
+import {
+  EEG_TRANSPORT, connectHeadset, eegBaseline, disconnectHeadset, fetchEegStatus, scanHeadsets, selectEegStream, subscribeEegStream,
+} from "@/api/eeg.api";
 import type { StreamStatus } from "@/lib/realtime/types";
-import type { EegStreamInput } from "@/types/api/input/useEeg";
-import type { EegStreamMessage, EegStreamOutput } from "@/types/api/output/useEeg";
+import type { EegBaselineInput, EegConnectInput, EegSelectInput, EegStreamInput } from "@/types/api/input/useEeg";
+import type { EegBaselineOutput, EegScanOutput, EegStatusOutput, EegStreamMessage, EegStreamOutput } from "@/types/api/output/useEeg";
 import { queryKeys } from "./queryKeys";
 
 /**
- * Listens to the EEG stream (SSE / WebSocket / mock).
+ * Listens to the EEG stream from the backend (SSE / WebSocket). Silent while no headset streams.
  * Every message goes into the React Query cache (setQueryData), so any component
  * can read the latest snapshot via the same key – no polling.
  */
@@ -49,4 +51,52 @@ export function useEegStream({ sessionId, enabled = true }: EegStreamInput = {})
   }, [sessionId, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { data, status, transport: EEG_TRANSPORT, rateHz };
+}
+
+/** Headset status (connected device, battery, recording) – polled every 3 s. */
+export function useEegStatus() {
+  return useQuery<EegStatusOutput>({
+    queryKey: queryKeys.eegStatus,
+    queryFn: fetchEegStatus,
+    refetchInterval: 3_000,
+    refetchIntervalInBackground: true,
+    retry: false,
+  });
+}
+
+/** Pick which Board stream to use (several headsets connected in BrainAccess Board). */
+export function useSelectEegStream() {
+  const qc = useQueryClient();
+  return useMutation<EegStatusOutput, Error, EegSelectInput>({
+    mutationFn: selectEegStream,
+    onSuccess: (status) => qc.setQueryData(queryKeys.eegStatus, status),
+  });
+}
+
+/** Direct mode: "Find headsets". */
+export function useScanHeadsets() {
+  return useMutation<EegScanOutput, Error, void>({ mutationFn: scanHeadsets });
+}
+
+/** Direct mode: "Connect". */
+export function useConnectHeadset() {
+  const qc = useQueryClient();
+  return useMutation<EegStatusOutput, Error, EegConnectInput>({
+    mutationFn: connectHeadset,
+    onSuccess: (status) => qc.setQueryData(queryKeys.eegStatus, status),
+  });
+}
+
+/** End the direct connection. */
+export function useDisconnectHeadset() {
+  const qc = useQueryClient();
+  return useMutation<EegStatusOutput, Error, void>({
+    mutationFn: disconnectHeadset,
+    onSuccess: (status) => qc.setQueryData(queryKeys.eegStatus, status),
+  });
+}
+
+/** Fixation cross baseline: mutate("start") when the cross appears, mutate("finish") after 30 s. */
+export function useEegBaseline() {
+  return useMutation<EegBaselineOutput, Error, EegBaselineInput>({ mutationFn: eegBaseline });
 }

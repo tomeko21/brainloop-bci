@@ -3,7 +3,6 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import { fileURLToPath, URL } from "node:url";
-import { localDataSink } from "./vite/localDataSink";
 
 /**
  * `npm run dev:mobile` (MOBILE=1) -> HTTPS + listening on the LAN.
@@ -11,15 +10,24 @@ import { localDataSink } from "./vite/localDataSink";
  */
 const mobile = process.env.MOBILE === "1";
 
-/** Folder for session data (default <repo>/data, next to frontend/). */
-const dataDir = process.env.LOCAL_DATA_DIR ?? fileURLToPath(new URL("../data", import.meta.url));
+/** FastAPI backend (see ../backend). */
+const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), localDataSink(dataDir), ...(mobile ? [basicSsl() as PluginOption] : [])],
+  plugins: [react(), tailwindcss(), ...(mobile ? [basicSsl() as PluginOption] : [])],
   resolve: {
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
-  server: mobile ? { host: true } : undefined,
+  server: {
+    host: mobile ? true : undefined,
+    // All API traffic goes through the dev server -> same origin, no CORS, works from the phone over HTTPS
+    proxy: {
+      "/api": { target: backendUrl, changeOrigin: true },
+      // NOTE: not just "/media" – that prefix would also catch /mediapipe/* (local MediaPipe files)
+      "/media/videos": { target: backendUrl, changeOrigin: true },
+      "/ws": { target: backendUrl.replace(/^http/, "ws"), ws: true, changeOrigin: true },
+    },
+  },
   build: {
     rollupOptions: {
       output: {

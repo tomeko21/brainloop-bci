@@ -1,18 +1,41 @@
+/**
+ * Tracks the reel currently on screen: events (view start/end), reel_views.csv rows
+ * (time on reel, % watched, loops, pauses, like, scroll speed on exit) and the heartbeat to the backend
+ * (admin live view: reel, playback position, face summary, prediction, calm filter, new events).
+ */
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { TRACKING } from "@/config/tracking";
 import { useReportActiveReel } from "@/hooks/useFeed";
 import { logEvent } from "@/store/csvLogStore";
 import { useFaceStore } from "@/store/faceStore";
 import { useMlStore } from "@/store/mlStore";
+import { useCalmStore } from "@/store/calmStore";
 import { playbackSnapshot, usePlaybackStore } from "@/store/playbackStore";
 import { useSessionStore } from "@/store/sessionStore";
 import { reelViewsTable } from "@/services/dataLogger/tables";
 import { timeOrigin } from "@/lib/timebase";
 import { saveUnsavedNow } from "@/services/storage/tableAutosave";
 import type { Reel } from "@/types/domain";
-import type { ReportActiveReelInput } from "@/types/api/input/useFeed";
+import type { LiveEventRow, ReportActiveReelInput } from "@/types/api/input/useFeed";
+import { useCsvLogStore } from "@/store/csvLogStore";
+
+/** Timestamp of the newest event already sent with a heartbeat (module-level: survives reel changes). */
+let lastSentEventTs = 0;
+
+/** events.csv rows of this session logged since the previous heartbeat. */
+function takeNewEvents(sessionId: string): LiveEventRow[] {
+  const rows = useCsvLogStore.getState().rows;
+  const fresh: LiveEventRow[] = [];
+  for (let i = rows.length - 1; i >= 0 && rows[i].tsMs > lastSentEventTs; i--) {
+    if (rows[i].sessionId === sessionId) fresh.push(rows[i]);
+  }
+  if (rows.length) lastSentEventTs = Math.max(lastSentEventTs, rows[rows.length - 1].tsMs);
+  return fresh.reverse();
+}
 
 interface Options {
+  /** Feed visible – when false the current view ends and the admin sees the viewer as offline. */
+  enabled: boolean;
   /** Latest version of the reel (e.g. like state) at the moment of leaving. */
   getReel: (id: string) => Reel | undefined;
   /** Peak scroll speed since the last call. */
@@ -37,14 +60,19 @@ export function useActiveReelTracking(reel: Reel | undefined, index: number, opt
   });
   const lastSent = useRef<ReportActiveReelInput | null>(null);
 
-  // Leaving the feed (e.g. to settings) -> admin immediately sees "offline"
-  useEffect(() => () => {
-    if (lastSent.current) report({ ...lastSent.current, left: true });
-  }, [report]);
+  // Leaving the feed (another tab / end of session) -> admin immediately sees "offline"
+  const enabled = opts.enabled;
+  useEffect(() => {
+    if (!enabled) return;
+    return () => {
+      if (lastSent.current) report({ ...lastSent.current, left: true, events: [] });
+    };
+  }, [enabled, report]);
 
   useEffect(() => {
-    if (!reel || !session) return;
+    if (!reel || !session || !enabled) return;
     const startedAt = Date.now();
+    usePlaybackStore.getState().reset(reel.id, reel.durationSec * 1000);
     opts.takeScrollPeak(); // reset the peak – we only count movement that leaves this reel
     logEvent("reel_view_start", { reelId: reel.id, tsMs: startedAt, value: index });
 
@@ -55,8 +83,10 @@ export function useActiveReelTracking(reel: Reel | undefined, index: number, opt
       viewFinished = true;
       const end = Date.now();
       const pb = usePlaybackStore.getState();
-      const played = pb.reelId === reel.id ? pb.playedMs : 0;
-      const durationMs = reel.durationSec * 1000;
+      const mine = pb.reelId === reel.id;
+      const played = mine ? pb.playedMs : 0;
+      // Real video duration (falls back to the dataset's value if the video never loaded)
+      const durationMs = mine && pb.durationMs > 1 ? Math.round(pb.durationMs) : Math.round(reel.durationSec * 1000);
       const nextIndex = indexRef.current;
       const origin = timeOrigin(startedAt);
       const latest = optsRef.current.getReel(reel.id) ?? reel;
@@ -75,7 +105,7 @@ export function useActiveReelTracking(reel: Reel | undefined, index: number, opt
         played_ms: Math.round(played),
         duration_ms: durationMs,
         watch_pct: Number(((played / durationMs) * 100).toFixed(1)),
-        completed_loops: Math.floor(played / durationMs),
+        completed_loops: mine ? pb.loops : 0,
         pause_count: pb.reelId === reel.id ? pb.pauseCount : 0,
         liked: latest.likedByMe ? 1 : 0,
         exit_direction: forcedExit ?? (nextIndex > index ? "next" : nextIndex < index ? "prev" : "end"),
@@ -97,6 +127,8 @@ export function useActiveReelTracking(reel: Reel | undefined, index: number, opt
         left,
         face: useFaceStore.getState().summary,
         prediction: useMlStore.getState().prediction,
+        events: takeNewEvents(session.id),
+        calmIntensity: Math.round(useCalmStore.getState().intensity * 100) / 100,
       };
       lastSent.current = payload;
       report(payload);
@@ -131,5 +163,5 @@ export function useActiveReelTracking(reel: Reel | undefined, index: number, opt
 
       finishView();
     };
-  }, [reel?.id, index, session, report]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [reel?.id, index, session, report, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 }

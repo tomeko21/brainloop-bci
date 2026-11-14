@@ -1,5 +1,10 @@
+/**
+ * Settings: where data goes (backend data/ folder), EEG headset status, row counts of every table,
+ * MediaPipe status, autosave status and manual exports.
+ */
 import { Database, Download, FileVideo, FolderOpen, HardDriveDownload, Package, ScanFace, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardTitle, Switch } from "@/components/ui";
+import { EegConnectPanel } from "@/features/recording/components/EegConnectPanel";
 import { useStorageStatus } from "@/hooks/useSession";
 import { useSettingsStore } from "@/store/settingsStore";
 import { getLastRecordingBlob } from "@/features/session/useSessionLifecycle";
@@ -83,6 +88,8 @@ export function DataCard() {
         {FACE_STATUS[faceStatus]}
       </div>
       {faceError && <p className="mt-1 text-xs text-danger">{faceError}</p>}
+
+      <EegConnectPanel className="mt-2" />
 
       <div className="mt-2 rounded-xl bg-surface p-2.5 text-xs">
         <div className="flex items-center justify-between">

@@ -1,3 +1,6 @@
+/**
+ * Settings: who is in the session (name, role, device, session id, start time, duration).
+ */
 import { Cpu, Hash, ShieldCheck, Timer } from "lucide-react";
 import { Badge, Card } from "@/components/ui";
 import { useUserProfile } from "@/hooks/useUser";

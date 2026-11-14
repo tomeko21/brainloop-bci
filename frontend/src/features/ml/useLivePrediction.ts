@@ -1,4 +1,10 @@
+/**
+ * Every 2 s: 10 s feature window (face + scroll + viewing) -> POST /api/ml/predict-window.
+ * The answer holds the camera BRI (null until the model is trained) and the EEG BRI of the same moment;
+ * both are written to ml_windows.csv – this is the training data for the camera model (see TODO.md).
+ */
 import { useEffect } from "react";
+import { ML } from "@/config/tuning";
 import { usePredictWindow } from "@/hooks/useMl";
 import { stamp } from "@/lib/timebase";
 import { mlWindowsTable } from "@/services/dataLogger/tables";
@@ -6,7 +12,7 @@ import { useMlStore } from "@/store/mlStore";
 import { selectIsActive, useSessionStore } from "@/store/sessionStore";
 import { buildFeatureWindow } from "./buildFeatureWindow";
 
-export const PREDICT_EVERY_MS = 2_000;
+export const PREDICT_EVERY_MS = ML.predictEveryMs;
 
 const r4 = (v: number) => (Number.isFinite(v) ? Math.round(v * 10_000) / 10_000 : NaN);
 
@@ -44,7 +50,8 @@ export function useLivePrediction() {
           dwell_mean_sec: r4(f.dwellMeanSec),
           watch_pct_mean: r4(f.watchPctMean),
           likes_in_window: f.likesInWindow,
-          bri_ai: p.bri,
+          bri_ai: p.bri ?? NaN, // NaN -> empty CSV cell
+          bri_eeg: p.briEeg ?? NaN,
           should_stop: p.shouldStop ? 1 : 0,
           model_version: p.modelVersion,
         });

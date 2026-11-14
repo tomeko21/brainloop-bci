@@ -1,7 +1,11 @@
+/**
+ * Settings: background colour, calm filter (+ live panel / preview), camera preview toggle.
+ */
 import { Leaf, Moon, Palette, ScanFace, Sun } from "lucide-react";
 import { Card, CardTitle, SegmentedControl, Switch } from "@/components/ui";
 import { logEvent } from "@/store/csvLogStore";
 import { useSettingsStore, type ThemeMode } from "@/store/settingsStore";
+import { CalmFilterPanel } from "@/features/calm/components/CalmFilterPanel";
 
 function Row({ icon, title, desc, children }: { icon: React.ReactNode; title: string; desc: string; children: React.ReactNode }) {
   return (
@@ -37,7 +41,11 @@ export function AppearanceCard() {
         ]}
       />
       <div className="mt-4 space-y-1">
-        <Row icon={<Leaf className="size-5 text-ok" />} title="Calm filter" desc="Calmer reels and muted colors">
+        <Row
+          icon={<Leaf className="size-5 text-ok" />}
+          title="Calm filter"
+          desc="On a dopamine peak: slowly fades colours, slows playback (max 0.7×), lowers volume + reminder every 5 min"
+        >
           <Switch
             checked={calmFilter}
             label="Calm filter"
@@ -47,6 +55,7 @@ export function AppearanceCard() {
             }}
           />
         </Row>
+        {calmFilter && <CalmFilterPanel />}
         <Row icon={<ScanFace className="size-5 text-neon-cyan" />} title="Camera preview" desc="Small preview in the corner while recording">
           <Switch checked={showCameraPreview} onChange={setShowCameraPreview} label="Camera preview" />
         </Row>

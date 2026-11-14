@@ -1,3 +1,6 @@
+/**
+ * Admin: the reel being watched right now, muted and kept in sync with the viewer's playback position.
+ */
 import { AnimatePresence, motion } from "motion/react";
 import { EyeOff, MonitorSmartphone, Pause, WifiOff } from "lucide-react";
 import { Badge, Card, CardTitle } from "@/components/ui";
@@ -6,6 +9,7 @@ import { ProgressBar } from "@/features/feed/components/ProgressBar";
 import { useLiveViewer } from "@/hooks/useAdmin";
 import { formatDuration } from "@/lib/format";
 import { useNow } from "@/lib/useNow";
+import { calmEffect } from "@/config/calmFilter";
 import type { LiveViewerOutput } from "@/types/api/output/useAdmin";
 
 const STATUS_BADGE = {
@@ -17,18 +21,19 @@ const STATUS_BADGE = {
 /** Playback position "now" = position from the heartbeat + time since the heartbeat (with looping). */
 function extrapolate(v: LiveViewerOutput | undefined, now: number) {
   const pb = v?.playback;
-  if (!pb || !v?.heartbeatAtMs) return { progress: 0, loop: 0 };
+  if (!pb || !v?.heartbeatAtMs) return { progress: 0, loop: 0, timeSec: null };
   const running = v.status === "online" && !pb.paused;
   const abs = pb.loops * pb.durationMs + pb.positionMs + (running ? Math.max(0, now - v.heartbeatAtMs) : 0);
-  return { progress: (abs % pb.durationMs) / pb.durationMs, loop: Math.floor(abs / pb.durationMs) };
+  const posMs = abs % pb.durationMs;
+  return { progress: posMs / pb.durationMs, loop: Math.floor(abs / pb.durationMs), timeSec: posMs / 1000 };
 }
 
-/** Mirror of the reel being watched NOW on another device (mock: in another tab). */
+/** Mirror of the reel being watched NOW on another device (heartbeats collected by the backend). */
 export function LiveReelMirror() {
   const { data } = useLiveViewer();
-  const now = useNow(100);
+  const now = useNow(250);
   const hasReel = data?.status !== "offline" && !!data?.reel;
-  const { progress, loop } = extrapolate(data, now);
+  const { progress, loop, timeSec } = extrapolate(data, now);
   const paused = data?.playback?.paused || data?.status === "background";
 
   return (
@@ -42,7 +47,15 @@ export function LiveReelMirror() {
           {hasReel && data?.reel ? (
             <motion.div key={data.reel.id} className="absolute inset-0"
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "-100%" }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}>
-              <ReelPlayer reel={data.reel} playing={!paused} calm={false} progressBar={<ProgressBar progress={progress} loop={loop} />} />
+              {/* The same video, muted, kept in sync with the viewer's position */}
+              <ReelPlayer
+                reel={data.reel}
+                playing={!paused}
+                muted
+                calmIntensity={data.calmIntensity ?? 0}
+                syncTimeSec={timeSec}
+                progressBar={<ProgressBar progress={progress} loop={loop} />}
+              />
               {paused && (
                 <div className="absolute inset-0 grid place-items-center">
                   <div className="grid size-14 place-items-center rounded-full bg-black/50 text-white backdrop-blur">
@@ -73,6 +86,8 @@ export function LiveReelMirror() {
           ["Reel", hasReel && data?.reel ? `#${data.reelIndex} · ${data.reel.id}` : "—"],
           ["Watching for", hasReel && data?.viewStartedAtMs ? formatDuration((now - data.viewStartedAtMs) / 1000) : "—"],
           ["Loop / pass", hasReel ? `pass ${loop + 1} · ${Math.round(progress * 100)}%` : "—"],
+          ["Calm filter", hasReel ? `${Math.round((data?.calmIntensity ?? 0) * 100)}%` : "—"],
+          ["Speed", hasReel ? `${calmEffect(data?.calmIntensity ?? 0).playbackRate.toFixed(2)}×` : "—"],
         ].map(([k, v]) => (
           <div key={k} className="rounded-lg bg-surface p-2">
             <dt className="text-muted">{k}</dt>

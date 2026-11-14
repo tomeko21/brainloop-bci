@@ -1,11 +1,21 @@
-/** Animated, blurred "blobs" of light + grid – futuristic background for the whole app. */
+/**
+ * Static "futuristic" background: soft colour glows + grid.
+ * Deliberately NOT animated and without CSS blur filters – a moving blurred background makes every
+ * glass card (backdrop-filter) re-blur on every frame, which made the whole app lag.
+ */
 export function AmbientBackground() {
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+    <div
+      aria-hidden
+      className="pointer-events-none fixed inset-0 -z-10"
+      style={{
+        background:
+          "radial-gradient(60vmax 60vmax at 0% 0%, rgb(167 139 250 / 0.16), transparent 60%)," +
+          "radial-gradient(55vmax 55vmax at 100% 100%, rgb(34 211 238 / 0.12), transparent 60%)," +
+          "radial-gradient(35vmax 35vmax at 60% 55%, rgb(244 114 182 / 0.07), transparent 60%)",
+      }}
+    >
       <div className="bg-grid absolute inset-0 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]" />
-      <div className="absolute -left-[15%] -top-[20%] size-[60vmax] animate-float-slow rounded-full bg-neon-violet/20 blur-[120px]" />
-      <div className="absolute -bottom-[25%] -right-[10%] size-[55vmax] animate-float-slow rounded-full bg-neon-cyan/15 blur-[120px] [animation-delay:-5s]" />
-      <div className="absolute left-[40%] top-[45%] size-[30vmax] animate-float-slow rounded-full bg-neon-pink/10 blur-[110px] [animation-delay:-9s]" />
     </div>
   );
 }

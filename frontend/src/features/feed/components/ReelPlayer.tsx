@@ -1,92 +1,171 @@
-import { motion } from "motion/react";
+/**
+ * Reel <video> player: play/pause, autoplay-with-sound fallback, calm filter effects
+ * (colour overlay, speed, volume), playback sync for the progress bar and the admin mirror.
+ */
+import { AnimatePresence, motion } from "motion/react";
+import { AlertTriangle, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { mediaUrl } from "@/api/client";
+import { usePlaybackStore } from "@/store/playbackStore";
+import { useCalmStore } from "@/store/calmStore";
+import { CALM_FILTER, calmEffect } from "@/config/calmFilter";
 import type { Reel } from "@/types/domain";
-import { cn } from "@/lib/cn";
+import { useVideoPlaybackSync } from "../useVideoPlaybackSync";
 
 interface Props {
   reel: Reel;
+  /** Should the video be playing right now. */
   playing: boolean;
-  calm: boolean;
-  /** Progress bar – the feed attaches the playback clock, admin the position from the heartbeat. */
+  /**
+   * Calm filter intensity 0..1. Omitted = follow the live calm filter of this device (feed);
+   * the admin mirror passes the viewer's value from the heartbeat.
+   */
+  calmIntensity?: number;
+  /** Mount the <video> at all (only the active reel and its neighbours – saves memory/bandwidth). */
+  mountVideo?: boolean;
+  muted?: boolean;
+  /** Active feed reel: report time to the playback store (progress, watch %, loops). */
+  trackPlayback?: boolean;
+  /** Jump back to the start (feed: the reel is no longer the active one). */
+  rewind?: boolean;
+  /** Admin mirror: keep the video near this position (seconds). */
+  syncTimeSec?: number | null;
   progressBar?: React.ReactNode;
 }
 
 /**
- * "Fake" video player – instead of a file we have an animated scene
- * built from the reel's palette. Progress is counted by the clock (store/playbackStore) – at the end the reel restarts.
- * Once we get real video, just drop in a <video> here.
+ * Reel video from the backend (/media/videos/...). Loops forever; the dataset videos are mostly
+ * landscape, so they are shown "contain" over the reel's colour gradient.
  */
-export function ReelPlayer({ reel, playing, calm, progressBar }: Props) {
+export function ReelPlayer({
+  reel, playing, calmIntensity, mountVideo = true, muted = false, trackPlayback, rewind, syncTimeSec, progressBar,
+}: Props) {
+  const video = useRef<HTMLVideoElement>(null);
+  const overlay = useRef<HTMLDivElement>(null);
+  /** Re-applies the current calm effect – a freshly loaded video resets its playbackRate to 1. */
+  const reapplyCalm = useRef<() => void>(() => undefined);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [h1, h2] = reel.palette;
-  const speed = calm ? 2 : reel.mood === "intense" ? 0.6 : 1;
-  const playState = playing ? "running" : "paused";
+  const audioBlocked = usePlaybackStore((s) => s.audioBlocked);
+
+  useVideoPlaybackSync(video, reel.id, !!trackPlayback && mountVideo);
+
+  // Play / pause; if the browser blocks autoplay with sound, fall back to muted
+  useEffect(() => {
+    const v = video.current;
+    if (!v) return;
+    if (!playing) {
+      v.pause();
+      return;
+    }
+    v.muted = muted || audioBlocked;
+    v.play().catch(() => {
+      v.muted = true;
+      if (!muted) usePlaybackStore.getState().setAudioBlocked(true);
+      void v.play().catch(() => undefined);
+    });
+  }, [playing, muted, audioBlocked, mountVideo]);
+
+  // Reels that are no longer active rewind, so coming back starts from the beginning
+  useEffect(() => {
+    if (rewind && video.current) video.current.currentTime = 0;
+  }, [rewind]);
+
+  // Calm filter, applied without touching the video's source or time (no reload, no restart, no re-render):
+  //  - colours/contrast: an OVERLAY above the video (backdrop-filter), the <video> itself is untouched,
+  //  - speed/volume: changed live on the playing element.
+  useEffect(() => {
+    if (!mountVideo) return;
+    const apply = (intensity: number) => {
+      const e = calmEffect(intensity);
+      const o = overlay.current;
+      if (o) {
+        const f = intensity > 0.001 ? `saturate(${e.saturation.toFixed(3)}) contrast(${e.contrast.toFixed(3)})` : "none";
+        o.style.backdropFilter = f;
+        o.style.setProperty("-webkit-backdrop-filter", f);
+      }
+      const v = video.current;
+      if (!v) return;
+      if (Math.abs(v.playbackRate - e.playbackRate) > 0.001) {
+        v.defaultPlaybackRate = e.playbackRate; // survives a pause/play or a re-buffer
+        v.playbackRate = e.playbackRate;
+      }
+      v.volume = e.volume;
+    };
+    if (calmIntensity !== undefined) {
+      reapplyCalm.current = () => apply(calmIntensity);
+      apply(calmIntensity);
+      return;
+    }
+    reapplyCalm.current = () => apply(useCalmStore.getState().intensity);
+    apply(useCalmStore.getState().intensity);
+    return useCalmStore.subscribe((s, prev) => s.intensity !== prev.intensity && apply(s.intensity));
+  }, [calmIntensity, mountVideo]);
+
+  // Admin mirror: follow the viewer's position (correct only bigger drift, to avoid stutter)
+  useEffect(() => {
+    const v = video.current;
+    if (v && syncTimeSec != null && Number.isFinite(v.duration) && Math.abs(v.currentTime - syncTimeSec) > 1.5) {
+      v.currentTime = syncTimeSec % v.duration;
+    }
+  }, [syncTimeSec]);
 
   return (
     <div
-      className={cn("absolute inset-0 overflow-hidden transition-[filter] duration-700", calm && "saturate-[0.55] brightness-90")}
-      style={{
-        background: `linear-gradient(135deg, hsl(${h1} 80% 18%), hsl(${h2} 75% 10%) 60%, hsl(${(h1 + 180) % 360} 70% 8%))`,
-      }}
+      className="absolute inset-0 overflow-hidden"
+      style={{ background: `linear-gradient(135deg, hsl(${h1} 70% 16%), hsl(${h2} 65% 8%) 60%, #000)` }}
     >
-      {/* Drifting blobs of light */}
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="absolute size-[70%] animate-float-slow rounded-full blur-3xl"
-          style={{
-            background: `hsl(${i === 1 ? h2 : h1} 90% 55% / 0.45)`,
-            left: `${[-10, 40, 10][i]}%`,
-            top: `${[-5, 30, 55][i]}%`,
-            animationDuration: `${(10 + i * 4) * speed}s`,
-            animationDelay: `${-i * 3}s`,
-            animationPlayState: playState,
+      {mountVideo && (
+        <video
+          ref={video}
+          src={mediaUrl(reel.videoUrl)}
+          className="absolute inset-0 size-full object-contain"
+          playsInline
+          loop
+          muted={muted || audioBlocked}
+          preload="auto"
+          onLoadedData={() => {
+            setState("ready");
+            reapplyCalm.current();
           }}
+          onWaiting={() => setState((s) => (s === "error" ? s : "loading"))}
+          onPlaying={() => setState("ready")}
+          onError={() => setState("error")}
         />
-      ))}
+      )}
 
-      {/* Central visualization depending on mood */}
-      <div className="absolute inset-0 grid place-items-center">
-        {reel.mood === "calm" ? (
-          <div className="relative size-48">
-            {[0, 1, 2, 3].map((i) => (
-              <span
-                key={i}
-                className="absolute inset-0 rounded-full border border-white/30"
-                style={{ animation: `pulse-ring ${3.2 * speed}s ease-out ${i * 0.8}s infinite`, animationPlayState: playState }}
-              />
-            ))}
-            <span className="absolute inset-[38%] rounded-full bg-white/70 blur-md" />
-          </div>
-        ) : (
-          <div className="flex h-40 items-end gap-1.5">
-            {Array.from({ length: 18 }, (_, i) => (
-              <span
-                key={i}
-                className="w-2 origin-bottom rounded-full bg-white/70"
-                style={{
-                  height: `${30 + ((i * 37) % 70)}%`,
-                  animation: `eq ${(0.5 + ((i * 13) % 7) / 10) * speed}s ease-in-out ${i * 0.05}s infinite alternate`,
-                  animationPlayState: playState,
-                }}
-              />
-            ))}
-          </div>
+      {/* Calm filter colour overlay (desaturates / flattens whatever is under it) */}
+      <div
+        ref={overlay}
+        className="pointer-events-none absolute inset-0"
+        style={{ transition: `backdrop-filter ${CALM_FILTER.overlayTransitionMs}ms linear` }}
+      />
+
+      <AnimatePresence>
+        {state !== "ready" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 grid place-items-center text-white/70"
+          >
+            {state === "error" ? (
+              <span className="flex items-center gap-2 text-sm"><AlertTriangle className="size-4" /> Video unavailable</span>
+            ) : (
+              mountVideo && <Loader2 className="size-8 animate-spin" />
+            )}
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
 
-      {/* Grain + vignette for a "cinematic" look */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgb(0_0_0/0.65))]" />
-      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />
+      {/* Vignette + bottom gradient so captions stay readable */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_55%,rgb(0_0_0/0.55))]" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />
 
-      {/* "Video" progress bar */}
       <div className="absolute inset-x-3 top-3 h-[3px] overflow-hidden rounded-full bg-white/20">{progressBar}</div>
 
-      <style>{`
-        @keyframes eq { from { transform: scaleY(0.15); } to { transform: scaleY(1); } }
-        @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 0.7; } 100% { transform: scale(2.2); opacity: 0; } }
-      `}</style>
-
-      {!playing && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/25" />
+      {!playing && mountVideo && state === "ready" && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pointer-events-none absolute inset-0 bg-black/25" />
       )}
     </div>
   );

@@ -2,12 +2,14 @@ import { AnimatePresence, motion } from "motion/react";
 import { useRecordingStore } from "@/store/recordingStore";
 import { formatDuration } from "@/lib/format";
 import { useNow } from "@/lib/useNow";
+import { useEegStatus } from "@/hooks/useEeg";
 
 /** Floating "REC 01:23" pill shown while the camera is recording. */
 export function RecordingIndicator() {
   const status = useRecordingStore((s) => s.status);
   const startedAtMs = useRecordingStore((s) => s.startedAtMs);
   const now = useNow(1_000, status === "recording");
+  const eegRecording = !!useEegStatus().data?.recording;
 
   return (
     <AnimatePresence>
@@ -23,6 +25,7 @@ export function RecordingIndicator() {
             <span className="relative size-2 rounded-full bg-red-500" />
           </span>
           REC {formatDuration((now - startedAtMs) / 1000)}
+          {eegRecording && <span className="rounded bg-ok/30 px-1 text-[10px] text-ok">+EEG</span>}
         </motion.div>
       )}
     </AnimatePresence>

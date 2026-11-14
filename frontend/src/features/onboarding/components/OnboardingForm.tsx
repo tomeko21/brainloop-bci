@@ -1,3 +1,6 @@
+/**
+ * Start screen form: subject name, camera opt-in, EEG headset status, start/continue session.
+ */
 import { motion } from "motion/react";
 import { ArrowRight, Radar, User } from "lucide-react";
 import { useState } from "react";
@@ -7,6 +10,7 @@ import { useSessionLifecycle } from "@/features/session/useSessionLifecycle";
 import { selectIsActive, useSessionStore } from "@/store/sessionStore";
 import { ROUTES } from "@/app/routes";
 import { CameraOptIn } from "./CameraOptIn";
+import { EegConnectPanel } from "@/features/recording/components/EegConnectPanel";
 
 export function OnboardingForm() {
   const [name, setName] = useState("");
@@ -42,6 +46,8 @@ export function OnboardingForm() {
       />
 
       <CameraOptIn enabled={camera} onChange={setCamera} />
+
+      <EegConnectPanel />
 
       {error && <p className="text-sm text-danger">{error}</p>}
 

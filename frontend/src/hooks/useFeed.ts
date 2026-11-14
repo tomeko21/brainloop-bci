@@ -3,15 +3,22 @@ import { fetchFeedPage, reportActiveReel, toggleLike } from "@/api/feed.api";
 import type { FeedPageInput, ReportActiveReelInput, ToggleLikeInput } from "@/types/api/input/useFeed";
 import type { FeedPageOutput, ReportActiveReelOutput, ToggleLikeOutput } from "@/types/api/output/useFeed";
 import { queryKeys } from "./queryKeys";
+import { FEED } from "@/config/tuning";
 
-const PAGE_SIZE = 6;
+/** Reels per request – the backend picks them in batches so the API is not hit on every swipe. */
+const PAGE_SIZE = FEED.pageSize;
 
 /** Infinite reel feed (cursor pagination). */
-export function useFeed({ calmFilter }: Pick<FeedPageInput, "calmFilter">) {
+export function useFeed({
+  sessionId,
+  startCursor = 0,
+}: Pick<FeedPageInput, "sessionId"> & { startCursor?: number }) {
   return useInfiniteQuery<FeedPageOutput, Error, InfiniteData<FeedPageOutput>, ReturnType<typeof queryKeys.feed>, number>({
-    queryKey: queryKeys.feed(calmFilter),
-    queryFn: ({ pageParam }) => fetchFeedPage({ cursor: pageParam, limit: PAGE_SIZE, calmFilter }),
-    initialPageParam: 0,
+    queryKey: queryKeys.feed(sessionId, startCursor),
+    queryFn: ({ pageParam }) => fetchFeedPage({ sessionId, cursor: pageParam, limit: PAGE_SIZE }),
+    enabled: sessionId.length > 0,
+    // A refresh starts from a new cursor -> the backend picks fresh reels
+    initialPageParam: startCursor,
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     staleTime: 60_000,
   });

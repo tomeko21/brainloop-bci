@@ -42,3 +42,14 @@ export const QUALITY_META: Record<ContactQuality, { label: string; color: string
   poor: { label: "poor contact / artifact", color: "var(--color-warn)" },
   none: { label: "no signal", color: "var(--color-danger)" },
 };
+
+/** Human label for the EEG state (GET /api/eeg/status). */
+export const EEG_STATE_LABEL: Record<string, string> = {
+  waiting: "waiting for BrainAccess Board",
+  connected: "found in Board – waiting for data",
+  streaming: "streaming",
+  stalled: "connected in Board, no data",
+  connecting: "connecting…",
+  error: "connection problem",
+  disconnected: "disconnected",
+};

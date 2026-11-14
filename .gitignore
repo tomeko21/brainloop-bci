@@ -1,2 +1,23 @@
-# Dane z sesji (wideo, CSV) – nigdy do repo
+# Session data (video, CSV, EEG) – never commit; data acquisition lives outside the repo
 data/
+data_acc/
+
+# Local reel videos (1+ GB) – each teammate keeps their own copy
+dataset_videos/
+
+# Secrets – DB password etc. (copy backend/.env.example to backend/.env)
+.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ruff_cache/
+
+# BrainAccess SDK download (the Python package comes from PyPI: brainaccess==4.0.0) and its log
+backend/BrainAccessSDK-*/
+backend/bacore.log
+
+# OS / editors
+.DS_Store

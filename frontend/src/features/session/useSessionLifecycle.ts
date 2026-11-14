@@ -1,3 +1,7 @@
+/**
+ * Session start / resume / end: creates the session on the backend, starts camera recording + MediaPipe,
+ * and at the end uploads every video segment and all CSV tables (the backend writes them to data/).
+ */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEndSession, useStartSession, useUploadDataset, useUploadRecording } from "@/hooks/useSession";
@@ -10,7 +14,7 @@ import { deleteSessionVideo, loadSegments } from "@/services/storage/videoStore"
 import { useSessionStore } from "@/store/sessionStore";
 import { useRecordingStore } from "@/store/recordingStore";
 import { logEvent } from "@/store/csvLogStore";
-import { downloadBlob, sessionFolderName } from "@/lib/files";
+import { downloadBlob } from "@/lib/files";
 import { useSettingsStore } from "@/store/settingsStore";
 import { ROUTES } from "@/app/routes";
 
@@ -75,13 +79,12 @@ export function useSessionLifecycle() {
   }
 
   /**
-   * Ends the session: saves to data/sessions/<folder>/ + appends to data/dataset/.
+   * Ends the session: the backend saves everything to data/sessions/<folder>/ + appends to data/dataset/.
    * The ZIP is downloaded when enabled in settings or when saving to data/ is unavailable.
    */
   async function finish() {
     const session = useSessionStore.getState().session;
     if (!session) return;
-    const folder = sessionFolderName(session);
     setFinishing(true);
     try {
       stopFaceTracking();
@@ -99,7 +102,6 @@ export function useSessionLifecycle() {
       for (const [i, seg] of segments.entries()) {
         const { recording } = await uploadRecording.mutateAsync({
           sessionId: session.id,
-          folder,
           blob: seg.blob,
           startedAtMs: seg.meta.startedAtMs,
           endedAtMs: seg.endMs,
@@ -115,7 +117,7 @@ export function useSessionLifecycle() {
       await endSession.mutateAsync({ sessionId: session.id, endedAtMs });
 
       const files = buildSessionCsvFiles(buildSessionRow(session, endedAtMs, recordings), recordings);
-      const saved = await uploadDataset.mutateAsync({ sessionId: session.id, folder, files });
+      const saved = await uploadDataset.mutateAsync({ sessionId: session.id, files });
 
       const download = useSettingsStore.getState().autoDownloadZip || !saved.savedTo;
       if (download) {
@@ -123,7 +125,8 @@ export function useSessionLifecycle() {
           files,
           segments.map((s, i) => ({ blob: s.blob, fileName: recordings[i].file })),
         );
-        downloadBlob(zip, `${folder}.zip`);
+        const folderName = saved.savedTo?.split("/").pop() ?? `brainloop_${session.id}`;
+        downloadBlob(zip, `${folderName}.zip`);
       }
       useSessionStore.getState().setLastExport({
         sessionId: session.id,

@@ -1,3 +1,6 @@
+/**
+ * Pill-style segmented switch (e.g. Black / White background) with an animated selection.
+ */
 import { motion } from "motion/react";
 import { useId } from "react";
 import { cn } from "@/lib/cn";

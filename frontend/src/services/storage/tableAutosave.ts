@@ -5,11 +5,12 @@
  * After a page refresh the tables are rebuilt from the chunks.
  */
 import { ALL_TABLES } from "@/services/dataLogger/tables";
+import { STORAGE } from "@/config/tuning";
 import { usePersistenceStore } from "@/store/persistenceStore";
 import { useSessionStore } from "@/store/sessionStore";
 import { STORES, idbDeleteBySession, idbGetAllBySession, idbPut } from "./idb";
 
-export const AUTOSAVE_MS = 1_000;
+export const AUTOSAVE_MS = STORAGE.autosaveMs;
 
 interface TableChunk {
   id?: number;

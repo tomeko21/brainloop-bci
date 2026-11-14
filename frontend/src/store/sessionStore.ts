@@ -25,6 +25,9 @@ interface SessionState {
   /** How many recording segments have been started (the next one has number = segmentCount). */
   segmentCount: number;
   lastExport: LastExport | null;
+  /** Session id whose 30 s fixation-cross baseline is done (the cross is shown once per session). */
+  baselineDoneFor: string | null;
+  setBaselineDone: (sessionId: string) => void;
   setLastExport: (e: LastExport | null) => void;
   setSession: (session: SessionInfo | null) => void;
   registerSegmentStart: (startedAtMs: number) => void;
@@ -39,6 +42,8 @@ export const useSessionStore = create<SessionState>()(
       recordingOriginMs: null,
       segmentCount: 0,
       lastExport: null,
+      baselineDoneFor: null,
+      setBaselineDone: (baselineDoneFor) => set({ baselineDoneFor }),
       setLastExport: (lastExport) => set({ lastExport }),
       setSession: (session) => set({ session, recordingOriginMs: null, segmentCount: 0 }),
       registerSegmentStart: (startedAtMs) =>

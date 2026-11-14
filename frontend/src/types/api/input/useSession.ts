@@ -13,8 +13,6 @@ export interface EndSessionInput {
 /** POST /api/sessions/{id}/recording (multipart) */
 export interface UploadRecordingInput {
   sessionId: string;
-  /** Session folder in data/sessions/ (e.g. 2026-11-14_12-03_kacper_ses_xxx). */
-  folder: string;
   blob: Blob;
   startedAtMs: number;
   endedAtMs: number;
@@ -23,7 +21,6 @@ export interface UploadRecordingInput {
 /** POST /api/sessions/{id}/dataset – all the session's CSV tables (session, events, reel_views, scroll, face). */
 export interface UploadDatasetInput {
   sessionId: string;
-  folder: string;
   files: { name: string; csv: string }[];
 }
 
