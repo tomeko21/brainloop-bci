@@ -1,6 +1,5 @@
 # Session data (video, CSV, EEG) – never commit; data acquisition lives outside the repo
 data/
-data_acc/
 
 # Local reel videos (1+ GB) – each teammate keeps their own copy
 dataset_videos/
