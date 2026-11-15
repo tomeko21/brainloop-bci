@@ -23,4 +23,3 @@ cd ../frontend && npm install && npm run dev     # app on http://localhost:5173
 Phone (camera needs HTTPS): `npm run dev:mobile` and open `https://<laptop-ip>:5173`.
 
 Details: [backend/README.md](backend/README.md), [frontend/README.md](frontend/README.md).
-What is not implemented yet (camera BRI model, heart rate) and the exact function contracts: [TODO.md](TODO.md).
