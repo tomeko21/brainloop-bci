@@ -20,7 +20,22 @@ uv run api                                       # API on http://localhost:8000 
 cd ../frontend && npm install && npm run dev     # app on http://localhost:5173
 ```
 
-Phone (camera needs HTTPS): `npm run dev:mobile` and open `https://<laptop-ip>:5173`.
+### Phone + laptop (scroll on the phone, admin panel on the laptop)
+
+Everything runs on the laptop, the phone only opens the page. Phone and laptop must be on the same Wi-Fi.
+
+```bash
+cd backend && uv run api              # terminal 1, backend stays on 127.0.0.1:8000, no --host needed
+cd frontend && npm run dev:mobile     # terminal 2, HTTPS on the LAN (phones allow the camera only over HTTPS)
+```
+
+- Vite prints a `Network:` address, e.g. `https://192.168.1.23:5173` (or check the laptop IP with
+  `ipconfig getifaddr en0` on macOS). Open it on the phone and accept the self-signed certificate warning.
+- On the laptop open `https://localhost:5173/admin` for the admin panel with the live BRI.
+- The phone never talks to the backend directly: Vite proxies `/api`, `/media/videos` and `/ws` to
+  `127.0.0.1:8000`, so there is no CORS or firewall setup for port 8000. If the phone can't load the page,
+  allow incoming connections for node/Vite in the macOS firewall, or check that the Wi-Fi isn't a guest
+  network with client isolation.
+- EEG: connect the headset in BrainAccess Board on the laptop before starting, the backend picks up the stream.
 
 Details: [backend/README.md](backend/README.md), [frontend/README.md](frontend/README.md).
-What is not implemented yet (camera BRI model, heart rate) and the exact function contracts: [TODO.md](TODO.md).
