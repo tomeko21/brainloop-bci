@@ -1,0 +1,22 @@
+[project]
+name = "brainrot-data-acc"
+version = "0.1.0"
+description = "EEG (BrainAccess) + camera (MediaPipe) data acquisition protocol and Brain Rot model"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "numpy>=2.1",
+  "scipy>=1.14",
+  "pandas>=2.2",
+  "opencv-python>=4.10,<5",
+  "mediapipe>=0.10.18",
+  "pylsl>=1.16",
+  "brainaccess==4.0.0",
+  "scikit-learn>=1.5",
+  "matplotlib>=3.9",
+  "torch>=2.15.0",
+  "onnx>=1.23.2",
+  "onnxruntime>=1.32.0",
+]
+
+[tool.uv]
+package = false
